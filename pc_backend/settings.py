@@ -14,6 +14,8 @@ from pathlib import Path
 from datetime import timedelta
 import mimetypes
 from corsheaders.defaults import default_headers
+import cloudinary
+import cloudinary.uploader
 
 mimetypes.add_type('text/css', '.css', True)
 mimetypes.add_type('text/javascript', '.js', True)
@@ -43,6 +45,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'Authentication',
+    'users',
     'rest_framework',
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
@@ -175,6 +178,12 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
+
+cloudinary.config(
+    cloud_name="dmdzc5b7e",
+    api_key="813314662477451",
+    api_secret="3c9tCr0rDbpFRJEmgJ8ZNV256xI",
+)
 
 
 # Static files (CSS, JavaScript, Images)

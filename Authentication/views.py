@@ -21,7 +21,33 @@ class RegisterAPIView(APIView):
             context={'role': role})
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
-        return Response({"message": "Registered successfully"})
+        refresh = RefreshToken.for_user(user)
+        access = refresh.access_token
+
+        user_data = {
+            "id": user.id,
+            "email": user.email,
+            "username": user.username,
+            "role": user.role,
+        }
+
+        response = Response(
+            {
+                "access": str(access),
+                "user": user_data,
+            },
+            status=status.HTTP_201_CREATED
+        )
+
+        response.set_cookie(
+            key="refresh_token",
+            value=str(refresh),
+            httponly=True,
+            secure=False,        # True in production
+            samesite="Lax",
+            max_age=24 * 60 * 60,
+        )
+        return response
     
 class LoginAPIView(APIView):
 
