@@ -7,6 +7,11 @@ from rest_framework.response import Response
 import cloudinary.uploader
 from rest_framework import status
 from .models import Address
+from Authentication.models import User
+import random
+from django.core.mail import send_mail
+from django.conf import settings
+from .models import EmailOTP
 
 # Create your views here.
 
@@ -16,7 +21,7 @@ class ProfileView(APIView):
     def get(self,request):
         profile = request.user.user_profile
         serializer = ProfileSerializer(profile)
-        return Response(serializer.data)
+        return Response(serializer.data,status=status.HTTP_200_OK)
     
     def patch(self,request):
 
@@ -73,13 +78,6 @@ class UserAddressView(APIView):
 
     def get(self,request):
         addresses = Address.objects.filter(user=request.user)
-       
-        if not addresses.exists():
-            return Response(
-                {"message": "No addresses found"},
-                status=status.HTTP_404_NOT_FOUND
-            )
-        
         serializer = UserAddressSerializer(addresses, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
@@ -170,5 +168,139 @@ class UserAddressView(APIView):
                 next_address.save()
 
         return Response(status=status.HTTP_204_NO_CONTENT)
+    
+class ChangePasswordView(APIView):
+    permission_classes=[IsAuthenticated]
+
+    def post(self,request):
+        user=request.user
+        old_password=request.data.get('old_password')
+        new_password=request.data.get('new_password')
+        confirm_password = request.data.get("confirm_password")
+
+        if not old_password or not new_password or not confirm_password:
+            return Response(
+                {"detail": "All fields are required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not user.check_password(old_password):
+            return Response(
+                {"detail": "Old password is incorrect."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if new_password != confirm_password:
+            return Response(
+                {"detail": "New passwords do not match."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if old_password == new_password:
+            return Response(
+                {"detail": "New password must be different from old password."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        user.set_password(new_password)
+        user.save()
+
+        return Response(
+            {"detail": "Password changed successfully. Please log in again."},
+            status=status.HTTP_200_OK
+        )
+            
+
+class ChangeEmailView(APIView):
+    def post(self,request):
+        email=request.data.get('email')
+        if not email:
+            return Response(
+                {"error": "Email is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if email != request.user.email:
+            return Response(
+                {"error": "Email does not match your account"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        
+        otp = random.randint(100000, 999999)
+
+        EmailOTP.objects.create(
+            user=request.user,
+            email=email,
+            otp=otp
+        )
+        
+
+        send_mail(
+            subject="Confirm Email Change",
+            message=f"Your OTP for EMAIL change is: {otp}",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[email],
+            fail_silently=False,
+        )
+
+        return Response(
+            {"message": "OTP sent to email"},
+            status=status.HTTP_200_OK
+        )
+    
+class EmailChangeVerifyView(APIView):
+    def post(self,request):
+        otp=request.data.get('otp')
+        if not otp:
+            return Response({"error":"enter otp"},status=status.HTTP_400_BAD_REQUEST)
+        
+        record = EmailOTP.objects.filter(
+            user=request.user,
+            otp=otp,
+            is_verified=False
+        ).first()
+
+        if not record:
+            return Response({"error": "Invalid OTP"}, status=400)
+        
+        if record.is_expired():
+            return Response({"error": "OTP expired"}, status=400)
+        
+        record.is_verified = True
+        record.save()
+
+        request.session["email_verified"] = True
+
+        return Response(
+            {"message": "Email verified. You can now change email."},
+            status=status.HTTP_200_OK
+        )
+    
+class UpdateEmailView(APIView):
+    def post(self,request):
+        if not request.session.get("email_verified"):
+            return Response(
+                {"error": "Verify email first"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        new_email = request.data.get("email")
+
+        if User.objects.filter(email=new_email).exists():
+            return Response(
+                {"error": "Email already in use"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        request.user.email = new_email
+        request.user.save()
+
+        request.session.pop("email_verified", None)
+
+        return Response(
+            {"message": "Email changed successfully"},
+            status=status.HTTP_200_OK
+        )
+        
+        
+            
 
 
