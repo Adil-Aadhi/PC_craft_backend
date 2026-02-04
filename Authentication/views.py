@@ -60,6 +60,15 @@ class LoginAPIView(APIView):
         refresh = RefreshToken.for_user(user)
         access = refresh.access_token
 
+        worker_profile = getattr(user, "worker_profile", None)
+
+        user_data = {
+            "id": user.id,
+            "email": user.email,
+            "role": user.role,
+            "kyc_status": worker_profile.kyc_status if worker_profile else None
+        }
+
         response = Response({
             "access": str(access),
             "user":user_data

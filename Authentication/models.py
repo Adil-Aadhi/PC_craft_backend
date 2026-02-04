@@ -78,7 +78,7 @@ class WorkerProfile(models.Model):
         blank=True,
         null=True
     )
-    status = models.CharField(
+    kyc_status = models.CharField(
     choices=[('pending','Pending'), ('approved','Approved'), ('rejected','Rejected')],
     default='pending'
 )

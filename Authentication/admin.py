@@ -18,9 +18,9 @@ class WorkerProfileAdmin(admin.ModelAdmin):
     list_display = (
         'id',
         'user',
-        'status',
+        'kyc_status',
         'availability',
         'rating'
     )
-    list_filter = ('status', 'availability')
+    list_filter = ('kyc_status', 'availability')
     search_fields = ('user__username', 'user__email')
