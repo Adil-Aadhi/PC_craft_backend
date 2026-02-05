@@ -81,7 +81,9 @@ class WorkerProfile(models.Model):
     kyc_status = models.CharField(
     choices=[('pending','Pending'), ('approved','Approved'), ('rejected','Rejected')],
     default='pending'
-)
+    )
+    banner_image = models.URLField(blank=True, null=True)
+    banner_image_id = models.CharField(max_length=255, blank=True, null=True)
   
     def __str__(self):
         return self.user.email
