@@ -42,6 +42,7 @@ class ProfileImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
         fields = ["profile_image", "profile_image_id"]
+        ref_name = "UserProfileImage"
 
 class UserAddressSerializer(serializers.ModelSerializer):
     class Meta:

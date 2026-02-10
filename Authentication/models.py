@@ -63,8 +63,29 @@ class UserProfile(models.Model):
         return self.full_name
 
 class WorkerProfile(models.Model):
+
+    GENDER_CHOICES = (
+        ('male', 'Male'),
+        ('female', 'Female'),
+        ('other', 'Other'),
+        ('prefer_not_to_say', 'Prefer not to say'),
+    )
+
+    KYC_STATUS_CHOICES = [
+            ('started', 'Started'),     # user opened / filling KYC
+            ('pending', 'Pending'),     # user submitted, waiting for admin
+            ('approved', 'Approved'),   # admin approved
+            ('rejected', 'Rejected'),   # admin rejected
+        ]
+
     id = models.BigAutoField(primary_key=True)
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='worker_profile')
+    gender = models.CharField(
+        max_length=20,
+        choices=GENDER_CHOICES,
+        blank=True,
+        null=True
+    )
 
     description = models.CharField(max_length=255,blank=True,null=True)
     skills = models.TextField(blank=True,null=True)
@@ -79,9 +100,10 @@ class WorkerProfile(models.Model):
         null=True
     )
     kyc_status = models.CharField(
-    choices=[('pending','Pending'), ('approved','Approved'), ('rejected','Rejected')],
-    default='pending'
-    )
+            max_length=20,
+            choices=KYC_STATUS_CHOICES,
+            default='started'
+        )
     banner_image = models.URLField(blank=True, null=True)
     banner_image_id = models.CharField(max_length=255, blank=True, null=True)
   
