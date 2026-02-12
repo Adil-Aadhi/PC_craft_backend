@@ -14,6 +14,7 @@ from django.conf import settings
 from .models import EmailOTP
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
+from rest_framework.parsers import MultiPartParser, FormParser
 
 # Create your views here.
 
@@ -63,6 +64,7 @@ class ProfileView(APIView):
     
 class UpdateProfileImage(APIView):
     permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
 
     @swagger_auto_schema(
         operation_summary="Update profile image",
