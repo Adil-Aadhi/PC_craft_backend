@@ -11,9 +11,11 @@ import requests
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
+
 # Create your views here.
 
 User = get_user_model()
+
 
 class RegisterAPIView(APIView):
 

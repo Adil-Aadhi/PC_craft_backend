@@ -94,5 +94,5 @@ class TestUpdateProfileImage:
 
         response = self.client.delete(self.url)
 
-        assert response.status_code == status.HTTP_301_MOVED_PERMANENTLY
+        assert response.status_code == status.HTTP_200_OK
         mock_destroy.assert_called_once_with("cloudinary_id_123")

@@ -2,12 +2,13 @@ from rest_framework import serializers
 from Authentication.models import UserProfile,User
 from .models import Address
 import re
+from Worker.models import ChatRoom,ChatMessage
 
 
 class UserMiniSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ["id", "username", "email"]
+        fields = ["id", "username", "email","role"]
 
 class ProfileSerializer(serializers.ModelSerializer):
     user=UserMiniSerializer(read_only=True)
@@ -50,3 +51,67 @@ class UserAddressSerializer(serializers.ModelSerializer):
         model=Address
         fields= "__all__"
         read_only_fields = ["user"]
+
+
+class ChatListSerializer(serializers.ModelSerializer):
+    other_user = serializers.SerializerMethodField()
+    last_message = serializers.SerializerMethodField()
+    last_message_time = serializers.SerializerMethodField()
+    unread_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ChatRoom
+        fields = [
+            "id",
+            "room_name",
+            "other_user",
+            "last_message",
+            "last_message_time",
+            "unread_count",
+        ]
+
+    # 👇 PASTE HERE — inside class
+    def get_other_user(self, obj):
+        request_user = self.context["request"].user
+
+        other = obj.participants.exclude(id=request_user.id).first()
+
+        if not other:
+            return None
+
+        profile = getattr(other, "userprofile", None)
+
+        full_name = profile.full_name if profile and profile.full_name else other.username
+        profile_image = (
+            profile.profile_image.url
+            if profile and profile.profile_image
+            else None
+        )
+
+        return {
+            "id": other.id,
+            "full_name": full_name,
+            "profile_image": profile_image,
+        }
+
+    def get_last_message(self, obj):
+        last_msg = ChatMessage.objects.filter(
+            room_name=obj.room_name
+        ).order_by("-timestamp").first()
+
+        return last_msg.message if last_msg else ""
+
+    def get_last_message_time(self, obj):
+        last_msg = ChatMessage.objects.filter(
+            room_name=obj.room_name
+        ).order_by("-timestamp").first()
+
+        return last_msg.timestamp if last_msg else None
+
+    def get_unread_count(self, obj):
+        request_user = self.context["request"].user
+
+        return ChatMessage.objects.filter(
+            room_name=obj.room_name,
+            is_seen=False
+        ).exclude(sender=request_user).count()

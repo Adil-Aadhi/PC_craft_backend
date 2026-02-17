@@ -2,7 +2,7 @@ from django.shortcuts import render
 from Authentication.models import UserProfile
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
-from .serializers import ProfileSerializer,ProfileUpdateSerializer,ProfileImageSerializer,UserAddressSerializer
+from .serializers import ProfileSerializer,ProfileUpdateSerializer,ProfileImageSerializer,UserAddressSerializer,UserMiniSerializer,ChatListSerializer
 from rest_framework.response import Response
 import cloudinary.uploader
 from rest_framework import status
@@ -15,8 +15,16 @@ from .models import EmailOTP
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from rest_framework.parsers import MultiPartParser, FormParser
+from Worker.models import ChatRoom
 
 # Create your views here.
+
+class MeAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        serializer = UserMiniSerializer(request.user)
+        return Response(serializer.data)
 
 class ProfileView(APIView):
     permission_classes=[IsAuthenticated]
@@ -64,7 +72,7 @@ class ProfileView(APIView):
     
 class UpdateProfileImage(APIView):
     permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]
+    
 
     @swagger_auto_schema(
         operation_summary="Update profile image",
@@ -136,7 +144,7 @@ class UpdateProfileImage(APIView):
             profile.profile_image_id = None
             profile.save()
 
-            return Response({"message": "Profile image deleted"},status=status.HTTP_301_MOVED_PERMANENTLY)
+            return Response({"message": "Profile image deleted"},status=status.HTTP_200_OK)
     
 
 class UserAddressView(APIView):
@@ -609,3 +617,21 @@ class UpdateEmailView(APIView):
             {"message": "Email changed successfully"},
             status=status.HTTP_200_OK
         )
+    
+class ChatListAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # get rooms where logged user is participant
+        rooms = ChatRoom.objects.filter(
+            participants=request.user
+        ).order_by("-created_at")
+
+        serializer = ChatListSerializer(
+            rooms,
+            many=True,
+            context={"request": request}
+        )
+
+        return Response(serializer.data)
+    
