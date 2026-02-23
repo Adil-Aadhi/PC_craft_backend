@@ -7,7 +7,7 @@ def create_profiles(sender,instance,created,**kwargs):
     if not created:
         return None
     
-    UserProfile.objects.create(user=instance)
+    UserProfile.objects.get_or_create(user=instance)
 
-    if instance.role == 'worker':
-        WorkerProfile.objects.create(user=instance)
+    if instance.role == "worker":
+        WorkerProfile.objects.get_or_create(user=instance)

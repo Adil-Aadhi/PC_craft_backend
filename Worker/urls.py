@@ -12,5 +12,5 @@ urlpatterns=[
     path("chat/requests/", ChatRequestCreateAPIView.as_view(), name="chat-request-create"),
     path("worker_list/", WorkerListAPIView.as_view(), name="worker-list"),
     path("chat/request/<int:request_id>/action/",ChatRequestActionAPIView.as_view(),name="chat-request-action"),
-    path("kyc/submit",WorkerKycStatusChangeAPIView.as_view(),name="chat-request-action"),
+    path("kyc/submit/",WorkerKycStatusChangeAPIView.as_view(),name="chat-request-action"),
 ]

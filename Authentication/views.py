@@ -91,7 +91,7 @@ class LoginAPIView(APIView):
         serializer.is_valid(raise_exception=True)
 
         user = serializer.validated_data['user']
-        user_data = serializer.validated_data["user_data"]
+        # user_data = serializer.validated_data["user_data"]
         refresh = RefreshToken.for_user(user)
         access = refresh.access_token
 

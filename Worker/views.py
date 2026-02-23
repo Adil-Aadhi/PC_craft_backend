@@ -13,6 +13,9 @@ from django.db.models import Exists, OuterRef
 import uuid
 from django.utils import timezone
 from django.db import transaction
+from notification.models import FCMToken,Notification
+from notification.utils import send_fcm_notification
+
 
 
 
@@ -320,10 +323,19 @@ class WorkerListAPIView(APIView):
             status="pending"
         )
 
+        accepted_requests = ChatRequest.objects.filter(
+            sender=request.user,
+            receiver=OuterRef("user"),
+            status="accepted"
+        )
+
         workers = (
             WorkerProfile.objects
             .select_related("user")
-            .annotate(has_requested=Exists(pending_requests))
+            .annotate(has_requested=Exists(pending_requests),
+                      is_connected=Exists(accepted_requests)
+            )
+            .filter(is_connected=False) # 👈 hide accepted users
         )
 
         serializer = WorkerListSerializer(workers, many=True)
@@ -393,10 +405,33 @@ class ChatRequestCreateAPIView(APIView):
             context={"request": request}
         )
 
-        print("user",request.user)
 
         if serializer.is_valid():
             chat_request = serializer.save()
+
+            receiver = chat_request.receiver
+            Notification.objects.create(
+                user=chat_request.receiver,
+                title="New Chat Request 💬",
+                message=f"{request.user.username} sent you a chat request",
+                chat_request=chat_request
+            )
+            tokens = FCMToken.objects.filter(user=receiver)
+            for t in tokens:
+                try:
+                    send_fcm_notification(
+                        token=t.token,
+                        title="New Chat Request 💬",
+                        body=f"{request.user.username} sent you a chat request",
+                        data={
+                            "type": "chat_request",
+                            "request_id": str(chat_request.id),
+                            "sender_id": str(request.user.id),
+                        }
+                    )
+                except Exception as e:
+                    print("FCM error:", e)
+
             return Response(
                 {
                     "message": "Chat request sent",
@@ -512,6 +547,51 @@ class WorkerDetailsView(APIView):
     permission_classes = [IsAuthenticated]
 
     @swagger_auto_schema(
+        operation_summary="Get worker profile details",
+        operation_description="Returns the authenticated worker's profile details.",
+        responses={
+            200: openapi.Response(
+                description="Worker details fetched successfully",
+                schema=WorkerDetailsSerializer()
+            ),
+            403: openapi.Response(
+                description="Only workers can access this endpoint",
+                examples={
+                    "application/json": {
+                        "detail": "Only workers have profiles."
+                    }
+                }
+            ),
+            404: openapi.Response(
+                description="Worker profile not found",
+                examples={
+                    "application/json": {
+                        "detail": "Worker profile not found."
+                    }
+                }
+            ),
+        }
+    )
+
+    def get(self, request):
+        if request.user.role != "worker":
+            return Response(
+                {"detail": "Only workers have profiles."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        try:
+            worker = WorkerProfile.objects.get(user=request.user)
+        except WorkerProfile.DoesNotExist:
+            return Response(
+                {"detail": "Worker profile not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = WorkerDetailsSerializer(worker)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @swagger_auto_schema(
         operation_summary="Update worker details",
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
@@ -569,7 +649,7 @@ class WorkerDetailsView(APIView):
             serializer.save()
 
             return Response(
-                {"detail": "Worker details updated successfully"},
+                serializer.data,
                 status=status.HTTP_200_OK
             )
 
@@ -600,6 +680,7 @@ class WorkerIdentityKYCAPIView(APIView):
             401: "Unauthorized",
         },
         security=[{"Bearer": []}],
+        tags=["Worker KYC"],
     )
 
     def get(self, request):
@@ -661,6 +742,7 @@ class WorkerIdentityKYCAPIView(APIView):
             401: "Unauthorized",
         },
         security=[{"Bearer": []}],
+        tags=["Worker KYC"],
     )
 
     def post(self, request):
@@ -707,6 +789,7 @@ class WorkerPayoutAPIView(APIView):
             401: "Unauthorized",
         },
         security=[{"Bearer": []}],
+        tags=["Worker KYC"],
     )
 
     def get(self, request):
@@ -743,6 +826,7 @@ class WorkerPayoutAPIView(APIView):
             401: "Unauthorized",
         },
         security=[{"Bearer": []}],
+        tags=["Worker KYC"],
     )
 
     def post(self, request):
@@ -790,6 +874,7 @@ class WorkerKycStatusChangeAPIView(APIView):
             401: "Unauthorized",
         },
         security=[{"Bearer": []}],
+        tags=["Worker KYC"],
     )
 
     def post(self,request):
@@ -803,3 +888,4 @@ class WorkerKycStatusChangeAPIView(APIView):
             )
         except WorkerProfile.DoesNotExist:
             return Response({"error":"invalid user"},status=status.HTTP_404_NOT_FOUND)
+        

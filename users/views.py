@@ -23,9 +23,22 @@ class MeAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        serializer = UserMiniSerializer(request.user)
-        return Response(serializer.data)
+        user = request.user
 
+        kyc_status = None
+
+        if user.role == "worker":
+            worker_profile = getattr(user, "worker_profile", None)
+            kyc_status = worker_profile.kyc_status if worker_profile else "started"
+
+        return Response({
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "role": user.role,
+            "kyc_status": kyc_status
+        })
+    
 class ProfileView(APIView):
     permission_classes=[IsAuthenticated]
 

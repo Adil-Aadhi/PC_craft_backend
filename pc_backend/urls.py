@@ -41,6 +41,8 @@ urlpatterns = [
     path('api/auth/',include("Authentication.urls")),
     path("api/users/", include("users.urls")),
     path("api/workers/", include("Worker.urls")), 
+    path("api/notifications/", include("notification.urls")), 
+    path("api/products/", include("products.urls")), 
 
     # Swagger URLs
     re_path(r'^swagger(?P<format>\.json|\.yaml)$',

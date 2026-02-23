@@ -54,6 +54,8 @@ INSTALLED_APPS = [
     'Authentication',
     'users',
     'Worker',
+    'notification',
+    'products',
     'rest_framework',
     'drf_yasg',
     'rest_framework_simplejwt.token_blacklist',
@@ -89,6 +91,17 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'pc_backend.wsgi.application'
+
+SWAGGER_SETTINGS = {
+    "USE_SESSION_AUTH": False,
+    "SECURITY_DEFINITIONS": {
+        "Bearer": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header",
+        }
+    },
+}
 
 
 # Database

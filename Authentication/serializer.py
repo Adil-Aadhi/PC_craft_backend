@@ -1,6 +1,7 @@
 from .models import User
 from rest_framework import serializers
 from django.contrib.auth import authenticate
+from .models import WorkerProfile
 
 class RegisterSerializer(serializers.Serializer):
     full_name = serializers.CharField()
@@ -49,11 +50,12 @@ class RegisterSerializer(serializers.Serializer):
 
         return user
     
-class UserSerializer(serializers.ModelSerializer):
+class UserMiniSerializer(serializers.ModelSerializer):
+    kyc_status = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = ["id", "username", "email", "role"]
-
     
 class LoginSerializer(serializers.Serializer):
 
@@ -71,6 +73,6 @@ class LoginSerializer(serializers.Serializer):
         
         data["user"] = user
         
-        data['user_data'] = UserSerializer(user).data
+        # data['user_data'] = UserMiniSerializer(user).data
 
         return data
