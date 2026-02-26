@@ -2,7 +2,7 @@ from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from .serializer import RegisterSerializer,LoginSerializer
+from .serializer import RegisterSerializer,LoginSerializer,ForgotPasswordSerializer,VerifyOTPSerializer,ResetPasswordSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework import status
@@ -10,6 +10,11 @@ from django.contrib.auth import get_user_model
 import requests
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
+from .utils import generate_otp
+from .models import PasswordResetOTP
+from django.core.mail import send_mail
+from django.utils import timezone
+from datetime import timedelta
 
 
 # Create your views here.
@@ -356,6 +361,109 @@ class LogoutAPIView(APIView):
         response.delete_cookie("refresh_token", path="/")
         return response
 
+class ForgotPasswordView(APIView):
+    def post(self, request):
+        serializer = ForgotPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data["email"]
+
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response(
+                {"error": "User with this email does not exist"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        otp = generate_otp()
+
+        PasswordResetOTP.objects.create(user=user, otp=otp)
+
+        send_mail(
+            subject="Your Password Reset OTP",
+            message=f"Your OTP is {otp}. It is valid for 5 minutes.",
+            from_email="your_email@gmail.com",
+            recipient_list=[email],
+        )
+
+        return Response({"message": "OTP sent to email"}, status=200)
+    
+class VerifyOTPView(APIView):
+    def post(self, request):
+        serializer = VerifyOTPSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data["email"]
+        otp = serializer.validated_data["otp"]
+
+        try:
+            user = User.objects.get(email=email)
+            otp_obj = PasswordResetOTP.objects.filter(
+                user=user, otp=otp, is_verified=False
+            ).last()
+        except User.DoesNotExist:
+            return Response({"error": "Invalid email"}, status=400)
+
+        if not otp_obj:
+            return Response({"error": "Invalid OTP"}, status=400)
+
+        if otp_obj.is_expired():
+            return Response({"error": "OTP expired"}, status=400)
+
+        otp_obj.is_verified = True
+        otp_obj.save()
+
+        return Response({"message": "OTP verified"}, status=200)
+    
+class ResetPasswordView(APIView):
+    def post(self, request):
+        serializer = ResetPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data["email"]
+        password = serializer.validated_data["password"]
+
+        # 🔐 Check user exists
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response(
+                {"email": ["User with this email does not exist"]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # 🔐 Get latest verified OTP
+        otp_obj = PasswordResetOTP.objects.filter(
+            user=user,
+            is_verified=True,
+        ).last()
+
+        if not otp_obj:
+            return Response(
+                {"otp": ["OTP not verified"]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # 🔐 Check OTP expiry (example: 5 minutes)
+        if otp_obj.created_at < timezone.now() - timedelta(minutes=5):
+            otp_obj.delete()
+            return Response(
+                {"otp": ["OTP expired. Please request a new one"]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # 🔐 Set new password (hashed)
+        user.set_password(password)
+        user.save()
+
+        # 🔐 Delete OTP after success
+        otp_obj.delete()
+
+        return Response(
+            {"message": "Password reset successful"},
+            status=status.HTTP_200_OK,
+        )
 
     
 

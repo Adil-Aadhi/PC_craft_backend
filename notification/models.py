@@ -4,9 +4,12 @@ from Worker.models import ChatRequest
 
 # Create your models here.
 class FCMToken(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
     token = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user} - FCM"
 
 class Notification(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)

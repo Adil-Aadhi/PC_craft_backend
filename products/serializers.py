@@ -117,6 +117,10 @@ class CabinetSerializer(BaseProductSerializer):
     max_cpu_cooler_height_mm = serializers.IntegerField(source="case_spec.max_cpu_cooler_height_mm")
     has_rgb = serializers.BooleanField(source="case_spec.has_rgb")
     side_panel = serializers.CharField(source="case_spec.side_panel")
+    supported_fan_sizes = serializers.CharField(
+        source="case_spec.supported_fan_sizes",
+        read_only=True
+    ) 
 
     class Meta(BaseProductSerializer.Meta):
         fields = BaseProductSerializer.Meta.fields + [
@@ -125,6 +129,7 @@ class CabinetSerializer(BaseProductSerializer):
             "max_cpu_cooler_height_mm",
             "has_rgb",
             "side_panel",
+            "supported_fan_sizes",
         ]
 
 class CaseFanSerializer(BaseProductSerializer):

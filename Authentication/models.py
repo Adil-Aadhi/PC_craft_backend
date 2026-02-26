@@ -110,6 +110,14 @@ class WorkerProfile(models.Model):
     def __str__(self):
         return self.user.email
 
+class PasswordResetOTP(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    otp = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_verified = models.BooleanField(default=False)
 
+    def is_expired(self):
+        from django.utils.timezone import now
+        return (now() - self.created_at).seconds > 300
 
 

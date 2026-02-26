@@ -1,8 +1,7 @@
 from django.shortcuts import render
-from Authentication.models import UserProfile
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
-from .serializers import ProfileSerializer,ProfileUpdateSerializer,ProfileImageSerializer,UserAddressSerializer,UserMiniSerializer,ChatListSerializer
+from .serializers import ProfileSerializer,ProfileUpdateSerializer,ProfileImageSerializer,UserAddressSerializer,ChatListSerializer,ChangePasswordSerializer
 from rest_framework.response import Response
 import cloudinary.uploader
 from rest_framework import status
@@ -14,7 +13,6 @@ from django.conf import settings
 from .models import EmailOTP
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
-from rest_framework.parsers import MultiPartParser, FormParser
 from Worker.models import ChatRoom
 
 # Create your views here.
@@ -407,41 +405,23 @@ class ChangePasswordView(APIView):
         tags=["Password"],
     )
 
-    def post(self,request):
-        user=request.user
-        old_password=request.data.get('old_password')
-        new_password=request.data.get('new_password')
-        confirm_password = request.data.get("confirm_password")
+    def post(self, request):
+        serializer = ChangePasswordSerializer(
+            data=request.data,
+            context={"request": request}
+        )
 
-        if not old_password or not new_password or not confirm_password:
-            return Response(
-                {"detail": "All fields are required."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        serializer.is_valid(raise_exception=True)
 
-        if not user.check_password(old_password):
-            return Response(
-                {"detail": "Old password is incorrect."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        if new_password != confirm_password:
-            return Response(
-                {"detail": "New passwords do not match."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        if old_password == new_password:
-            return Response(
-                {"detail": "New password must be different from old password."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
+        user = request.user
+        new_password = serializer.validated_data["new_password"]
+
         user.set_password(new_password)
         user.save()
 
         return Response(
-            {"detail": "Password changed successfully. Please log in again."},
-            status=status.HTTP_200_OK
+            {"message": "Password changed successfully. Please log in again."},
+            status=status.HTTP_200_OK,
         )
             
 

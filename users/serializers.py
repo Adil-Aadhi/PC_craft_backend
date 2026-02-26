@@ -3,6 +3,9 @@ from Authentication.models import UserProfile,User
 from .models import Address
 import re
 from Worker.models import ChatRoom,ChatMessage
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
+
 
 
 class UserMiniSerializer(serializers.ModelSerializer):
@@ -115,3 +118,59 @@ class ChatListSerializer(serializers.ModelSerializer):
             room_name=obj.room_name,
             is_seen=False
         ).exclude(sender=request_user).count()
+    
+class ChangePasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(write_only=True)
+    confirm_password = serializers.CharField(write_only=True)
+
+    def validate(self, data):
+        user = self.context["request"].user
+
+        old_password = data.get("old_password")
+        new_password = data.get("new_password")
+        confirm_password = data.get("confirm_password")
+
+        # 🔐 Check old password
+        if not user.check_password(old_password):
+            raise serializers.ValidationError(
+                {"old_password": ["Old password is incorrect"]}
+            )
+
+        # 🔐 Match new passwords
+        if new_password != confirm_password:
+            raise serializers.ValidationError(
+                {"confirm_password": ["Passwords do not match"]}
+            )
+
+        # 🔐 New must be different
+        if old_password == new_password:
+            raise serializers.ValidationError(
+                {"new_password": ["New password must be different from old password"]}
+            )
+
+        # 🔐 Custom strength rules (same as frontend)
+        errors = []
+
+        if len(new_password) < 8:
+            errors.append("Minimum 8 characters required")
+
+        if not re.search(r"[A-Z]", new_password):
+            errors.append("At least one uppercase letter required")
+
+        if not re.search(r"[0-9]", new_password):
+            errors.append("At least one number required")
+
+        if not re.search(r"[^A-Za-z0-9]", new_password):
+            errors.append("At least one special character required")
+
+        # 🔐 Django built-in validators
+        try:
+            validate_password(new_password, user=user)
+        except DjangoValidationError as e:
+            errors.extend(e.messages)
+
+        if errors:
+            raise serializers.ValidationError({"new_password": errors})
+
+        return data

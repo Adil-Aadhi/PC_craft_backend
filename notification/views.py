@@ -4,22 +4,28 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from .models import FCMToken,Notification
 
+
 # Create your views here.
 class SaveFCMTokenAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        token = request.data.get("fcm_token")
+        try:
+            token = request.data.get("fcm_token") or request.data.get("token")
 
-        if not token:
-            return Response({"error": "Token required"}, status=400)
+            if not token:
+                return Response({"error": "Token required"}, status=400)
 
-        FCMToken.objects.update_or_create(
-            user=request.user,
-            defaults={"token": token}
-        )
+            FCMToken.objects.update_or_create(
+                user=request.user,
+                defaults={"token": token}
+            )
 
-        return Response({"message": "FCM token saved"})
+            return Response({"message": "FCM token saved"}, status=200)
+
+        except Exception as e:
+            print("FCM SAVE ERROR:", str(e))
+            return Response({"error": "Server error"}, status=500)
     
 class WorkerNotificationListAPIView(APIView):
     permission_classes = [IsAuthenticated]

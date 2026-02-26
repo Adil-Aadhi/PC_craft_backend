@@ -135,6 +135,7 @@ class CASESpec(models.Model):
     max_cpu_cooler_height_mm = models.PositiveIntegerField(blank=True, null=True)
     has_rgb = models.BooleanField(default=False)
     side_panel = models.CharField(max_length=100)
+    supported_fan_sizes = models.CharField(max_length=100, blank=True, null=True)
     description=models.TextField(blank=True, null=True)
 
     def __str__(self):

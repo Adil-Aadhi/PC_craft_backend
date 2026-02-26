@@ -14,6 +14,7 @@ from .serializers import (
     CaseFanSerializer,
     CoolerSerializer
 )
+from .utils.pagination import ComponentPagination
 
 # Create your views here.
 
@@ -21,17 +22,35 @@ class BaseComponentListView(ListAPIView):
     serializer_class = None
     category_name = None
     spec_related = None
+    pagination_class = ComponentPagination
 
     def get_queryset(self):
-        return (
-            Product.objects.filter(
-                category__name=self.category_name,
-                is_active=True,
-                is_deleted=False,
-            )
-            .select_related(self.spec_related, "brand", "category")
-            .order_by("-id")
-        )
+        queryset = Product.objects.filter(
+            category__name=self.category_name,
+            is_active=True,
+            is_deleted=False,
+        ).select_related(
+            self.spec_related, "brand", "category"
+        ).order_by("-id")
+
+        # 🔎 SEARCH
+        search = self.request.query_params.get("search")
+        if search:
+            queryset = queryset.filter(name__icontains=search)
+
+        # 💰 PRICE FILTER
+        price = self.request.query_params.get("price")
+
+        if price == "lt20":  # < 20000
+            queryset = queryset.filter(price__lt=20000)
+
+        elif price == "20to50":  # 20000 - 50000
+            queryset = queryset.filter(price__gte=20000, price__lte=50000)
+
+        elif price == "gt50":  # > 50000
+            queryset = queryset.filter(price__gt=50000)
+
+        return queryset
     
 class CPUListView(BaseComponentListView):
     serializer_class = CPUSerializer
