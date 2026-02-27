@@ -614,6 +614,19 @@ class UpdateEmailView(APIView):
 class ChatListAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        operation_summary="Get chat list",
+        operation_description=(
+            "Retrieve all chat rooms where the authenticated user is a participant. "
+            "Includes other user details, last message, last message time, and unread count."
+        ),
+        responses={
+            200: ChatListSerializer(many=True),
+            401: openapi.Response(description="Unauthorized"),
+        },
+        tags=["Chat"],
+    )
+
     def get(self, request):
         # get rooms where logged user is participant
         rooms = ChatRoom.objects.filter(

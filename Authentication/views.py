@@ -362,6 +362,39 @@ class LogoutAPIView(APIView):
         return response
 
 class ForgotPasswordView(APIView):
+
+    @swagger_auto_schema(
+        operation_summary="Forgot password - send OTP",
+        operation_description=(
+            "Send a 6-digit OTP to the user's registered email. "
+            "OTP is valid for 5 minutes."
+        ),
+        request_body=ForgotPasswordSerializer,
+        responses={
+            200: openapi.Response(
+                description="OTP sent successfully",
+                examples={
+                    "application/json": {
+                        "message": "OTP sent to email"
+                    }
+                },
+            ),
+            404: openapi.Response(
+                description="User not found",
+                examples={
+                    "application/json": {
+                        "error": "User with this email does not exist"
+                    }
+                },
+            ),
+            400: openapi.Response(
+                description="Invalid input data"
+            ),
+        },
+        tags=["Authentication"],
+    )
+
+
     def post(self, request):
         serializer = ForgotPasswordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -390,6 +423,35 @@ class ForgotPasswordView(APIView):
         return Response({"message": "OTP sent to email"}, status=200)
     
 class VerifyOTPView(APIView):
+
+    @swagger_auto_schema(
+        operation_summary="Verify OTP",
+        operation_description=(
+            "Verify the OTP sent to the user's email for password reset. "
+            "OTP must be valid and not expired."
+        ),
+        request_body=VerifyOTPSerializer,
+        responses={
+            200: openapi.Response(
+                description="OTP verified successfully",
+                examples={
+                    "application/json": {
+                        "message": "OTP verified"
+                    }
+                },
+            ),
+            400: openapi.Response(
+                description="Invalid email / OTP / expired OTP",
+                examples={
+                    "application/json": {
+                        "error": "Invalid OTP"
+                    }
+                },
+            ),
+        },
+        tags=["Authentication"],
+    )
+
     def post(self, request):
         serializer = VerifyOTPSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -417,6 +479,38 @@ class VerifyOTPView(APIView):
         return Response({"message": "OTP verified"}, status=200)
     
 class ResetPasswordView(APIView):
+
+    @swagger_auto_schema(
+        operation_summary="Reset password",
+        operation_description=(
+            "Reset the user's password after OTP verification. "
+            "Requires email and a strong new password."
+        ),
+        request_body=ResetPasswordSerializer,
+        responses={
+            200: openapi.Response(
+                description="Password reset successful",
+                examples={
+                    "application/json": {
+                        "message": "Password reset successful"
+                    }
+                },
+            ),
+            400: openapi.Response(
+                description="Validation error / OTP not verified / OTP expired",
+                examples={
+                    "application/json": {
+                        "password": [
+                            "Minimum 8 characters required",
+                            "At least one uppercase letter required"
+                        ]
+                    }
+                },
+            ),
+        },
+        tags=["Authentication"],
+    )
+
     def post(self, request):
         serializer = ResetPasswordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -464,7 +558,3 @@ class ResetPasswordView(APIView):
             {"message": "Password reset successful"},
             status=status.HTTP_200_OK,
         )
-
-    
-
-        

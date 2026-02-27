@@ -44,6 +44,7 @@ urlpatterns = [
     path("api/notifications/", include("notification.urls")), 
     path("api/products/", include("products.urls")), 
     path("api/cart/", include("cart.urls")), 
+    path("api/orders/", include("orders.urls")), 
 
     # Swagger URLs
     re_path(r'^swagger(?P<format>\.json|\.yaml)$',

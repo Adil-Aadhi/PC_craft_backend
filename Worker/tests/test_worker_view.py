@@ -108,8 +108,14 @@ class TestWorkerDetailsView:
         response = api_client.patch(url, payload, format="json")
 
         assert response.status_code == status.HTTP_200_OK
-        assert response.data["detail"] == "Worker details updated successfully"
 
+        # DRF UpdateAPIView returns updated object
+        assert response.data["description"] == "Experienced electrician"
+        assert response.data["skills"] == "Wiring, Installation"
+        assert response.data["experience_years"] == 5
+        assert response.data["hourly_rate"] == "600.00"
+
+        # DB validation
         worker_profile.refresh_from_db()
         assert worker_profile.description == "Experienced electrician"
         assert worker_profile.skills == "Wiring, Installation"

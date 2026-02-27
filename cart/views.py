@@ -9,11 +9,24 @@ from django.shortcuts import get_object_or_404
 from .models import Cart, CartItem
 from .serializer import CartItemWriteSerializer, CartItemReadSerializer, CartSerializer
 from products.models import Product
+from orders.models import Order
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 
 # Create your views here.
 
 class CartView(APIView):
     permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_summary="Get user cart",
+        operation_description="Retrieve all PC builds added to the authenticated user's cart.",
+        responses={
+            200: CartSerializer,
+            401: openapi.Response(description="Unauthorized"),
+        },
+        tags=["Cart"],
+    )
 
     def get(self, request):
         cart = (
@@ -61,6 +74,36 @@ class CartView(APIView):
 
         serializer = CartSerializer(cart)
         return Response(serializer.data,status=status.HTTP_200_OK)
+    
+    @swagger_auto_schema(
+        operation_summary="Add PC build to cart",
+        operation_description=(
+            "Add a custom PC build to the authenticated user's cart. "
+            "Automatically calculates total price and compatibility."
+        ),
+        request_body=CartItemWriteSerializer,
+        responses={
+            201: openapi.Response(
+                description="Build added to cart",
+                schema=CartItemReadSerializer,
+                examples={
+                    "application/json": {
+                        "message": "Build added to cart",
+                        "item": {
+                            "id": 1,
+                            "build_name": "Gaming Build",
+                            "total_price": 125000,
+                            "is_compatible": True,
+                            "compatibility_notes": "All components compatible",
+                        },
+                    }
+                },
+            ),
+            400: openapi.Response(description="Validation error"),
+            401: openapi.Response(description="Unauthorized"),
+        },
+        tags=["Cart"],
+    )
     
     def post(self, request):
         write_serializer = CartItemWriteSerializer(data=request.data)
@@ -128,6 +171,17 @@ class CartView(APIView):
 class updateCartItemView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        operation_summary="Get single cart build",
+        operation_description="Retrieve a specific PC build from the authenticated user's cart.",
+        responses={
+            200: CartItemReadSerializer,
+            401: openapi.Response(description="Unauthorized"),
+            404: openapi.Response(description="Build not found"),
+        },
+        tags=["Cart"],
+    )
+
     def get(self, request, item_id):
         cart_item = get_object_or_404(
             CartItem,
@@ -137,6 +191,37 @@ class updateCartItemView(APIView):
 
         serializer = CartItemReadSerializer(cart_item)
         return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    @swagger_auto_schema(
+        operation_summary="Update cart build",
+        operation_description=(
+            "Update one or more components of a PC build. "
+            "Recalculates total price and compatibility automatically."
+        ),
+        request_body=CartItemWriteSerializer,
+        responses={
+            200: openapi.Response(
+                description="Build updated successfully",
+                schema=CartItemReadSerializer,
+                examples={
+                    "application/json": {
+                        "message": "Build updated successfully",
+                        "item": {
+                            "id": 1,
+                            "build_name": "Updated Gaming Build",
+                            "total_price": 130000,
+                            "is_compatible": True,
+                            "compatibility_notes": "All components compatible"
+                        }
+                    }
+                },
+            ),
+            400: openapi.Response(description="Validation error"),
+            401: openapi.Response(description="Unauthorized"),
+            404: openapi.Response(description="Build not found"),
+        },
+        tags=["Cart"],
+    )
 
     def patch(self, request, item_id):
         cart_item = get_object_or_404(
@@ -213,6 +298,24 @@ class updateCartItemView(APIView):
             status=status.HTTP_200_OK
         )
     
+    @swagger_auto_schema(
+        operation_summary="Delete cart build",
+        operation_description="Remove a PC build from the authenticated user's cart.",
+        responses={
+            200: openapi.Response(
+                description="Build removed successfully",
+                examples={
+                    "application/json": {
+                        "message": "Build removed from cart"
+                    }
+                },
+            ),
+            401: openapi.Response(description="Unauthorized"),
+            404: openapi.Response(description="Build not found"),
+        },
+        tags=["Cart"],
+    )
+    
 
     def delete(self, request, item_id):
         cart_item = get_object_or_404(
@@ -230,6 +333,41 @@ class updateCartItemView(APIView):
 
 class CartItemSummaryView(APIView):
     permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_summary="Get cart build summary",
+        operation_description=(
+            "Retrieve a minimal summary of a specific PC build including "
+            "CPU name, GPU name, total price, and build status."
+        ),
+        responses={
+            200: openapi.Response(
+                description="Build summary retrieved successfully",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "build_name": openapi.Schema(type=openapi.TYPE_STRING),
+                        "cpu": openapi.Schema(type=openapi.TYPE_STRING, nullable=True),
+                        "gpu": openapi.Schema(type=openapi.TYPE_STRING, nullable=True),
+                        "total_price": openapi.Schema(type=openapi.TYPE_NUMBER, format="float"),
+                        "status": openapi.Schema(type=openapi.TYPE_STRING),
+                    },
+                ),
+                examples={
+                    "application/json": {
+                        "build_name": "Gaming Build",
+                        "cpu": "Ryzen 7 5800X",
+                        "gpu": "RTX 4070",
+                        "total_price": 145000,
+                        "status": "active"
+                    }
+                },
+            ),
+            401: openapi.Response(description="Unauthorized"),
+            404: openapi.Response(description="Build not found"),
+        },
+        tags=["Cart"],
+    )
 
     def get(self, request, item_id):
         cart_item = get_object_or_404(CartItem, id=item_id)
@@ -249,6 +387,21 @@ class CartItemSummaryView(APIView):
     
 class ChatBuildDetailView(APIView):
     permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_summary="Get full build details for chat",
+        operation_description=(
+            "Retrieve full PC build details including all components, "
+            "brand, category, and specifications. "
+            "Used for chat/realtime worker discussion."
+        ),
+        responses={
+            200: CartItemReadSerializer,
+            401: openapi.Response(description="Unauthorized"),
+            404: openapi.Response(description="Build not found"),
+        },
+        tags=["Chat Build"],
+    )
 
     def get(self, request, item_id):
         cart_item = get_object_or_404(
@@ -288,6 +441,53 @@ class ChatBuildDetailView(APIView):
 class UpdateBuildStatusView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        operation_summary="Worker update build status",
+        operation_description=(
+            "Allows a worker to accept or reject a PC build. "
+            "When accepted, an order is automatically created with PAYMENT_PENDING status."
+        ),
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=["status"],
+            properties={
+                "status": openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    enum=["accepted", "rejected"],
+                    description="Build status to set"
+                )
+            },
+            example={"status": "accepted"},
+        ),
+        responses={
+            200: openapi.Response(
+                description="Build status updated",
+                examples={
+                    "application/json": {
+                        "message": "Build accepted",
+                        "status": "accepted",
+                        "item_id": 12
+                    }
+                },
+            ),
+            400: openapi.Response(
+                description="Invalid status / already processed",
+                examples={
+                    "application/json": {
+                        "error": "Invalid status"
+                    }
+                },
+            ),
+            403: openapi.Response(
+                description="Only workers allowed"
+            ),
+            404: openapi.Response(
+                description="Build not found"
+            ),
+        },
+        tags=["Worker Build"],
+    )
+
     def post(self, request, item_id):
         user = request.user
 
@@ -296,14 +496,34 @@ class UpdateBuildStatusView(APIView):
             return Response({"detail": "Only workers allowed"}, status=403)
 
         status_value = request.data.get("status")
+        if not status_value:
+            return Response({"error": "Status missing", "data": request.data}, status=400)
 
         if status_value not in ["accepted", "rejected"]:
-            return Response({"detail": "Invalid status"}, status=400)
+            return Response({"error": "Invalid status", "received": status_value}, status=400)
 
         cart_item = get_object_or_404(CartItem, id=item_id)
 
+        # ❌ prevent re-processing
+        if cart_item.status in ["accepted", "rejected"]:
+            return Response({"detail": "Already processed"}, status=400)
+
         cart_item.status = status_value
         cart_item.save()
+
+        # ✅ Create order only when accepted
+        if status_value == "accepted":
+
+            # prevent duplicate order
+            if not hasattr(cart_item, "order"):
+
+                Order.objects.create(
+                    user=cart_item.cart.user,
+                    cart_item=cart_item,
+                    total_price=cart_item.total_price,
+                    worker=user,
+                    status="PAYMENT_PENDING"
+                )
 
         return Response({
             "message": f"Build {status_value}",

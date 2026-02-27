@@ -16,43 +16,49 @@ class TestChangePasswordView:
         self.user = User.objects.create_user(
             username="passuser",
             email="pass@example.com",
-            password="OldPass123",
+            password="OldPass123!",
             role="user"
         )
         self.url = reverse("change_password")
 
     def test_change_password_success(self):
-        self.client.force_authenticate(self.user)
+        self.client.force_authenticate(user=self.user)  # ✅ use keyword
 
         response = self.client.post(self.url, {
-            "old_password": "OldPass123",
-            "new_password": "NewPass123",
-            "confirm_password": "NewPass123"
-        })
+            "old_password": "OldPass123!",
+            "new_password": "NewPass123!",
+            "confirm_password": "NewPass123!"
+        }, format="json")
+
+        print(response.data)  # run once if still failing
 
         assert response.status_code == status.HTTP_200_OK
+        assert response.data["message"] == "Password changed successfully. Please log in again."
+
         self.user.refresh_from_db()
-        assert self.user.check_password("NewPass123")
+        assert self.user.check_password("NewPass123!")
 
     def test_wrong_old_password(self):
-        self.client.force_authenticate(self.user)
+        self.client.force_authenticate(user=self.user)
 
         response = self.client.post(self.url, {
             "old_password": "wrong",
-            "new_password": "NewPass123",
-            "confirm_password": "NewPass123"
-        })
+            "new_password": "NewPass123!",
+            "confirm_password": "NewPass123!"
+        }, format="json")
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_new_password_same_as_old(self):
-        self.client.force_authenticate(self.user)
+        self.client.force_authenticate(user=self.user)
 
         response = self.client.post(self.url, {
-            "old_password": "OldPass123",
-            "new_password": "OldPass123",
-            "confirm_password": "OldPass123"
-        })
+            "old_password": "OldPass123!",
+            "new_password": "OldPass123!",
+            "confirm_password": "OldPass123!"
+        }, format="json")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 

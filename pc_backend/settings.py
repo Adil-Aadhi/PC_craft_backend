@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     'notification',
     'products',
     'cart',
+    'orders',
     'rest_framework',
     'drf_yasg',
     'rest_framework_simplejwt.token_blacklist',
