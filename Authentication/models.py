@@ -2,7 +2,6 @@ from django.db import models
 from django.contrib.auth.models import AbstractBaseUser,PermissionsMixin
 from .managers import UserManager
 
-
 # Create your models here.
 
 class User(AbstractBaseUser, PermissionsMixin):
@@ -93,6 +92,7 @@ class WorkerProfile(models.Model):
     hourly_rate = models.DecimalField(max_digits=10, decimal_places=2,blank=True,null=True)
     availability = models.BooleanField(default=True)
     rating = models.DecimalField(max_digits=3, decimal_places=2, default=0)
+    review_count = models.IntegerField(default=0)
     profile_image = models.URLField(blank=True, null=True)
     profile_image_id = models.CharField(
         max_length=255,
@@ -120,4 +120,37 @@ class PasswordResetOTP(models.Model):
         from django.utils.timezone import now
         return (now() - self.created_at).seconds > 300
 
+
+class WorkerReview(models.Model):
+
+    RATING_CHOICES = [
+        (1, "1 Star"),
+        (2, "2 Stars"),
+        (3, "3 Stars"),
+        (4, "4 Stars"),
+        (5, "5 Stars"),
+    ]
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="given_reviews"
+    )
+
+    worker = models.ForeignKey(
+        WorkerProfile,
+        on_delete=models.CASCADE,
+        related_name="reviews"
+    )
+
+    order = models.ForeignKey("orders.Order", on_delete=models.CASCADE)
+
+    rating = models.IntegerField(choices=RATING_CHOICES)
+
+    review_text = models.TextField(blank=True, null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.email} -> {self.worker.user.email} ({self.rating})"
 

@@ -18,6 +18,7 @@ import cloudinary
 import cloudinary.uploader
 from dotenv import load_dotenv
 import os
+from kombu.utils.url import safequote
 
 load_dotenv()
 
@@ -51,14 +52,19 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'Authentication',
+
+    "Authentication.apps.AuthenticationConfig",
+    
     'users',
     'Worker',
     'notification',
     'products',
     'cart',
     'orders',
+    'Admins',
     'rest_framework',
+    "storages",
+    "django_celery_results",
     'drf_yasg',
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
@@ -119,6 +125,21 @@ DATABASES = {
         'PORT':  int(os.getenv('DB_PORT', 5432)),
     }
 }
+
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+
+AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME")
+AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME")
+
+AWS_S3_FILE_OVERWRITE = False
+AWS_DEFAULT_ACL = None
+AWS_S3_SIGNATURE_VERSION = "s3v4"
+
+DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com"
+MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/"
+
 
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
@@ -216,6 +237,36 @@ cloudinary.config(
     api_secret=os.getenv("CLOUDINARY_API_SECRET"),
 )
 
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
+
+
+# 🔵 DynamoDB Credentials
+DYNAMO_AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_DYNAMO_DB_ID")
+DYNAMO_AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY_DYNAMO_DB")
+DYNAMO_AWS_REGION = os.getenv("AWS_REGION")
+DYNAMODB_TABLE_NAME = os.getenv("DYNAMODB_TABLE_NAME")
+
+
+#celery
+
+CELERY_BROKER_URL = f"sqs://{safequote(os.getenv('AWS_ACCESS_KEY_ID_CELERY'))}:{safequote(os.getenv('AWS_SECRET_ACCESS_KEY_CELERY'))}@"
+
+CELERY_BROKER_TRANSPORT_OPTIONS = {
+    "region": "ap-south-1",
+    "visibility_timeout": 3600,
+    "polling_interval": 10,
+    "queue_name_prefix": ""
+}
+
+CELERY_TASK_DEFAULT_QUEUE = "celery"
+
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = "UTC"
+
+CELERY_RESULT_BACKEND = "django-db"
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
@@ -226,3 +277,14 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+
+STORAGES = {
+    "default": {
+        "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}

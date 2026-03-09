@@ -12,6 +12,8 @@ from products.models import Product
 from orders.models import Order
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
+from orders.utils.generate_quotation import generate_quotation_pdf
+from decimal import Decimal 
 
 # Create your views here.
 
@@ -489,44 +491,59 @@ class UpdateBuildStatusView(APIView):
     )
 
     def post(self, request, item_id):
+
         user = request.user
 
-        # 🔒 Only workers allowed
         if user.role != "worker":
             return Response({"detail": "Only workers allowed"}, status=403)
 
         status_value = request.data.get("status")
+
         if not status_value:
-            return Response({"error": "Status missing", "data": request.data}, status=400)
+            return Response({"error": "Status missing"}, status=400)
 
         if status_value not in ["accepted", "rejected"]:
-            return Response({"error": "Invalid status", "received": status_value}, status=400)
+            return Response({"error": "Invalid status"}, status=400)
 
         cart_item = get_object_or_404(CartItem, id=item_id)
 
-        # ❌ prevent re-processing
         if cart_item.status in ["accepted", "rejected"]:
             return Response({"detail": "Already processed"}, status=400)
 
         cart_item.status = status_value
         cart_item.save()
 
-        # ✅ Create order only when accepted
+        pdf_url = None
+        order = None
+
         if status_value == "accepted":
 
-            # prevent duplicate order
-            if not hasattr(cart_item, "order"):
+            service_charge = Decimal(
+                getattr(user.worker_profile, "hourly_rate", 0))
 
-                Order.objects.create(
+            components_total = cart_item.total_price
+            platform_fee = components_total * Decimal("0.003")
+            total_price = components_total + service_charge + platform_fee
+
+            if not Order.objects.filter(cart_item=cart_item).exists(): 
+
+                order = Order.objects.create(
                     user=cart_item.cart.user,
                     cart_item=cart_item,
-                    total_price=cart_item.total_price,
                     worker=user,
+                    components_total=components_total,
+                    worker_earning=service_charge, 
+                    platform_fee=platform_fee,
+                    total_price=total_price,
                     status="PAYMENT_PENDING"
                 )
+
+                pdf_url = generate_quotation_pdf(order)
 
         return Response({
             "message": f"Build {status_value}",
             "status": cart_item.status,
-            "item_id": cart_item.id
+            "item_id": cart_item.id,
+            "quotation_url": pdf_url,
+            "order_id": str(order.order_id) if order else None
         })

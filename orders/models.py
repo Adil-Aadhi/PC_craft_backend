@@ -26,7 +26,10 @@ class Order(models.Model):
         related_name="order"
     )
 
-    total_price = models.DecimalField(max_digits=10, decimal_places=2)
+    components_total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    platform_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    worker_earning = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    total_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     currency = models.CharField(max_length=10, default="INR")
 
     status = models.CharField(
@@ -38,11 +41,24 @@ class Order(models.Model):
     # optional: worker who accepted
     worker = models.ForeignKey(
         User,
-        on_delete=models.SET_NULL,
+        on_delete=models.SET_NULL, 
         null=True,
         blank=True,
         related_name="assigned_orders"
     )
+
+    quotation_pdf = models.FileField(
+        upload_to="quotations/",
+        null=True,
+        blank=True
+    )
+
+    invoice_pdf = models.FileField(
+        upload_to="invoices/",
+        null=True,
+        blank=True
+    )
+    # build_progress = models.JSONField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -51,37 +67,37 @@ class Order(models.Model):
         return f"Order #{self.id} - {self.user}"
     
 
-    
-# class Payment(models.Model):
+class Payment(models.Model):
 
-#     STATUS_CHOICES = [
-#         ("CREATED", "Created"),
-#         ("SUCCESS", "Success"),
-#         ("FAILED", "Failed"),
-#     ]
+    STATUS_CHOICES = [
+        ("CREATED", "Created"),
+        ("SUCCESS", "Success"),
+        ("FAILED", "Failed"),
+    ]
 
-#     METHOD_CHOICES = [
-#         ("RAZORPAY", "Razorpay"),
-#         ("STRIPE", "Stripe"),
-#     ]
+    order = models.ForeignKey(
+        Order,
+        on_delete=models.CASCADE,
+        related_name="payments"
+    )
 
-#     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="payments")
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    currency = models.CharField(max_length=10, default="INR")
 
-#     method = models.CharField(max_length=20, choices=METHOD_CHOICES)
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="CREATED"
+    )
 
-#     amount = models.DecimalField(max_digits=10, decimal_places=2)
-#     currency = models.CharField(max_length=10, default="INR")
+    # Razorpay IDs
+    razorpay_order_id = models.CharField(max_length=255, unique=True)
+    razorpay_payment_id = models.CharField(max_length=255, null=True, blank=True)
+    razorpay_signature = models.CharField(max_length=500, null=True, blank=True)
 
-#     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="CREATED")
+    paid_at = models.DateTimeField(null=True, blank=True)
 
-#     # 🔑 Gateway IDs
-#     gateway_order_id = models.CharField(max_length=255, null=True, blank=True)
-#     gateway_payment_id = models.CharField(max_length=255, null=True, blank=True)
-#     gateway_signature = models.CharField(max_length=500, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
-#     paid_at = models.DateTimeField(null=True, blank=True)
-
-#     created_at = models.DateTimeField(auto_now_add=True)
-
-#     def __str__(self):
-#         return f"Payment #{self.id} - Order #{self.order.id}"
+    def __str__(self):
+        return f"Payment #{self.id} - Order #{self.order.order_id}"

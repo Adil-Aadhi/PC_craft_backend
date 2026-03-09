@@ -2,6 +2,7 @@ from rest_framework import serializers
 from Authentication.models import WorkerProfile,UserProfile
 from .models import WorkerKycProgress,ChatRequest,WorkerIdentityKYC,WorkerPayoutDetails
 from Authentication.models import User
+from Admins.models import WorkerEarning
 
 class ProfileImageSerializer(serializers.ModelSerializer):
     class Meta:
@@ -257,3 +258,53 @@ class WorkerPayoutSerializer(serializers.ModelSerializer):
         )
         return payout
     
+class WorkerEarningSerializer(serializers.ModelSerializer):
+
+    order_id = serializers.UUIDField(source="order.order_id", read_only=True)
+    customer = serializers.CharField(source="order.user.username", read_only=True)
+    order_date = serializers.DateTimeField(source="order.created_at", read_only=True)
+
+    class Meta:
+        model = WorkerEarning
+        fields = [
+            "order_id",
+            "customer",
+            "component_reimbursement",
+            "service_earning",
+            "payout_amount",
+            "order_date",
+        ]
+
+class WorkerRevenueSummarySerializer(serializers.Serializer):
+
+    total_revenue = serializers.DecimalField(max_digits=12, decimal_places=2)
+    total_profit = serializers.DecimalField(max_digits=12, decimal_places=2)
+    completed_orders = serializers.IntegerField()
+
+class WorkerDashboardSerializer(serializers.Serializer):
+
+    # Earnings card
+    total_earnings = serializers.FloatField()
+    component_total = serializers.FloatField()
+    service_total = serializers.FloatField()
+    earnings_trend = serializers.FloatField()
+    previous_month_earnings = serializers.FloatField()
+
+    # Completed work
+    completed_jobs = serializers.IntegerField()
+    in_progress_jobs = serializers.IntegerField()
+    cancelled_jobs = serializers.IntegerField()
+    total_jobs = serializers.IntegerField()
+
+    # Rating
+    rating = serializers.FloatField()
+    total_reviews = serializers.IntegerField()
+    rating_counts = serializers.DictField()
+
+    # Recent projects
+    recent_projects = serializers.ListField()
+
+    # Earnings graph
+    earnings_graph = serializers.ListField()
+    weekly_earnings = serializers.FloatField()
+    earnings_growth = serializers.FloatField()

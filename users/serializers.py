@@ -83,6 +83,7 @@ class ChatListSerializer(serializers.ModelSerializer):
             return None
 
         profile = getattr(other, "userprofile", None)
+        worker_profile = getattr(other, "worker_profile", None)
 
         full_name = profile.full_name if profile and profile.full_name else other.username
         profile_image = (
@@ -91,10 +92,15 @@ class ChatListSerializer(serializers.ModelSerializer):
             else None
         )
 
+        rating = worker_profile.rating if worker_profile else None
+        review_count = worker_profile.review_count if worker_profile else 0
+ 
         return {
             "id": other.id,
             "full_name": full_name,
             "profile_image": profile_image,
+            "rating": rating,
+            "review_count": review_count,
         }
 
     def get_last_message(self, obj):

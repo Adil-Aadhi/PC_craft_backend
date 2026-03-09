@@ -3,11 +3,11 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
-from .serializers import ProfileImageSerializer,WorkerPersonalInfoSerializer,WorkerBannerImageSerializer,WorkerKycProgressSerializer,ChatRequestCreateSerializer,WorkerListSerializer,ChatRequestActionSerializer,WorkerDetailsSerializer,WorkerIdentityKYCSerializer,WorkerPayoutSerializer
+from .serializers import ProfileImageSerializer,WorkerPersonalInfoSerializer,WorkerBannerImageSerializer,WorkerKycProgressSerializer,ChatRequestCreateSerializer,WorkerListSerializer,ChatRequestActionSerializer,WorkerDetailsSerializer,WorkerIdentityKYCSerializer,WorkerPayoutSerializer,WorkerEarningSerializer,WorkerRevenueSummarySerializer,WorkerDashboardSerializer
 from .models import WorkerKycProgress,ChatRequest,ChatRoom,ChatMessage,WorkerIdentityKYC,WorkerPayoutDetails
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
-from Authentication.models import WorkerProfile
+from Authentication.models import WorkerProfile,WorkerReview
 from django.db import connection
 from django.db.models import Exists, OuterRef
 import uuid
@@ -15,6 +15,10 @@ from django.utils import timezone
 from django.db import transaction
 from notification.models import FCMToken,Notification
 from notification.utils import send_fcm_notification
+from django.db.models import Sum,Avg,Count
+from Admins.models import WorkerEarning
+from orders.models import Order
+from datetime import timedelta
 
 
 
@@ -335,7 +339,8 @@ class WorkerListAPIView(APIView):
             .annotate(has_requested=Exists(pending_requests),
                       is_connected=Exists(accepted_requests)
             )
-            .filter(is_connected=False) # 👈 hide accepted users
+            .filter(is_connected=False,kyc_status="approved")
+            
         )
 
         serializer = WorkerListSerializer(workers, many=True)
@@ -889,3 +894,205 @@ class WorkerKycStatusChangeAPIView(APIView):
         except WorkerProfile.DoesNotExist:
             return Response({"error":"invalid user"},status=status.HTTP_404_NOT_FOUND)
         
+class WorkerRevenueAPIView(APIView):
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+
+        worker = request.user
+
+        earnings = WorkerEarning.objects.filter(worker=worker)
+
+        # totals
+        total_revenue = earnings.aggregate(
+            total=Sum("payout_amount")
+        )["total"] or 0
+
+        total_profit = earnings.aggregate(
+            total=Sum("service_earning")
+        )["total"] or 0
+
+        completed_orders = Order.objects.filter(
+            worker=worker,
+            status="COMPLETED"
+        ).count()
+
+        summary_data = {
+            "total_revenue": total_revenue,
+            "total_profit": total_profit,
+            "completed_orders": completed_orders
+        }
+
+        summary_serializer = WorkerRevenueSummarySerializer(summary_data)
+
+        earnings_serializer = WorkerEarningSerializer(
+            earnings.order_by("-created_at"),
+            many=True
+        )
+
+        return Response({
+            "summary": summary_serializer.data,
+            "earnings": earnings_serializer.data
+        })
+    
+class WorkerDashboardView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+
+        worker = request.user
+
+        # ---------- Earnings ----------
+        earnings_data = WorkerEarning.objects.filter(
+            worker=worker
+        ).aggregate(
+            total_earnings=Sum("payout_amount"),
+            component_total=Sum("component_reimbursement"),
+            service_total=Sum("service_earning"),
+        )
+
+        total_earnings = earnings_data["total_earnings"] or 0
+        component_total = earnings_data["component_total"] or 0
+        service_total = earnings_data["service_total"] or 0
+
+
+        # Previous month earnings
+        now = timezone.now()
+        start_of_month = now.replace(day=1)
+
+        previous_month = start_of_month - timedelta(days=1)
+        prev_month_start = previous_month.replace(day=1)
+
+        previous_month_earnings = WorkerEarning.objects.filter(
+            worker=worker,
+            created_at__gte=prev_month_start,
+            created_at__lt=start_of_month
+        ).aggregate(total=Sum("payout_amount"))["total"] or 0
+
+
+        # Trend calculation
+        earnings_trend = 0
+        if previous_month_earnings > 0:
+            earnings_trend = (
+                (total_earnings - previous_month_earnings)
+                / previous_month_earnings
+            ) * 100
+
+
+        # ---------- Jobs ----------
+        completed_jobs = Order.objects.filter(
+            worker=worker,
+            status="COMPLETED"
+        ).count()
+
+        in_progress_jobs = Order.objects.filter(
+            worker=worker,
+            status="BUILD_IN_PROGRESS"
+        ).count()
+
+        cancelled_jobs = Order.objects.filter(
+            worker=worker,
+            status="CANCELLED"
+        ).count()
+
+        total_jobs = completed_jobs + in_progress_jobs + cancelled_jobs
+
+        # ---------- Reviews ----------
+        reviews = WorkerReview.objects.filter(worker__user=worker)
+
+        # Average rating
+        rating = reviews.aggregate(avg=Avg("rating"))["avg"] or 0
+
+        # Total reviews
+        total_reviews = reviews.count()
+
+        # Count each rating (1-5)
+        rating_data = reviews.values("rating").annotate(count=Count("rating"))
+
+        rating_counts = {str(i): 0 for i in range(1, 6)}
+
+        for item in rating_data:
+            rating_counts[str(item["rating"])] = item["count"]
+
+
+        # ---------- Recent Projects ----------
+        recent_orders = Order.objects.filter(
+            worker=worker
+        ).select_related("user").order_by("-created_at")[:3]
+
+        recent_projects = []
+
+        for order in recent_orders:
+            recent_projects.append({
+                "id": order.id,
+                "project_name": order.cart_item.build_name,
+                "client_name": order.user.user_profile.full_name,
+                "price": float(order.total_price)
+            })
+
+
+        # ---------- Weekly Earnings ----------
+        week_ago = now - timedelta(days=7)
+
+        weekly_earnings = WorkerEarning.objects.filter(
+            worker=worker,
+            created_at__gte=week_ago
+        ).aggregate(total=Sum("payout_amount"))["total"] or 0
+
+
+        # Earnings graph (last 7 days)
+        earnings_graph = []
+
+        for i in range(7):
+            day = now - timedelta(days=i)
+
+            amount = WorkerEarning.objects.filter(
+                worker=worker,
+                created_at__date=day.date()
+            ).aggregate(total=Sum("payout_amount"))["total"] or 0
+
+            earnings_graph.append({
+                "day": day.strftime("%a"),
+                "amount": float(amount)
+            })
+
+        earnings_graph.reverse()
+
+
+        # Weekly growth (simple example)
+        earnings_growth = 0
+        if previous_month_earnings > 0:
+            earnings_growth = (
+                (weekly_earnings - previous_month_earnings)
+                / previous_month_earnings
+            ) * 100
+
+
+        data = {
+            "total_earnings": float(total_earnings),
+            "component_total": float(component_total),
+            "service_total": float(service_total),
+
+            "earnings_trend": round(earnings_trend, 2),
+            "previous_month_earnings": float(previous_month_earnings),
+
+            "completed_jobs": completed_jobs,
+            "in_progress_jobs": in_progress_jobs,
+            "cancelled_jobs": cancelled_jobs,
+            "total_jobs": total_jobs,
+
+            "rating": round(rating, 2),
+            "total_reviews": total_reviews,
+            "rating_counts": rating_counts,
+
+            "recent_projects": recent_projects,
+
+            "earnings_graph": earnings_graph,
+            "weekly_earnings": float(weekly_earnings),
+            "earnings_growth": round(earnings_growth, 2),
+        }
+
+        serializer = WorkerDashboardSerializer(data)
+
+        return Response(serializer.data)

@@ -47,6 +47,7 @@ class CartItemReadSerializer(serializers.ModelSerializer):
             "is_compatible",
             "compatibility_notes",
             "created_at",
+            "status",
         ]
 
 class CartSerializer(serializers.ModelSerializer):
