@@ -3,19 +3,21 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAdminUser
 from Authentication.models import User,WorkerProfile
-from .serializers import AdminUserDetailSerializer,PendingWorkerSerializer,CompletedOrderSerializer,AdminOrderSerializer,RevenueDashboardSerializer,AdminDashboardSerializer
+from .serializers import AdminUserDetailSerializer,PendingWorkerSerializer,CompletedOrderSerializer,AdminOrderSerializer,RevenueDashboardSerializer,AdminDashboardSerializer,AdminProductSerializer,ProductCreateSerializer,CategorySerializer,AdminProductUpdateSerializer,AdminProductDetailSerializer
 from django.shortcuts import get_object_or_404
 from django.core.paginator import Paginator
 from django.db.models import Q
-from rest_framework.generics import ListAPIView
+from rest_framework.generics import ListAPIView ,RetrieveUpdateAPIView
 from rest_framework import status
 from notification.models import Notification
 from orders.models import Order
 from .models import WorkerEarning,AdminRevenue
 from django.db import transaction
-from .pagination import AdminOrderPagination
+from .pagination import AdminOrderPagination,AdminProductPagination
 from django.db.models import Sum, Avg, Count
 from django.db.models.functions import TruncMonth
+from products.models import Product,Category
+from rest_framework.parsers import MultiPartParser, FormParser ,JSONParser
 
  
 
@@ -101,6 +103,7 @@ class AdminUserStatsView(APIView):
         })
     
 class PendingWorkersAPIView(ListAPIView):
+    permission_classes = [IsAdminUser]
 
     serializer_class = PendingWorkerSerializer
     permission_classes = [IsAdminUser]
@@ -260,6 +263,8 @@ class AdminOrderListAPIView(ListAPIView):
     
 class AdminRevenueDashboardAPIView(APIView):
 
+    permission_classes = [IsAdminUser]
+
     def get(self, request):
 
         total_revenue = Order.objects.aggregate(
@@ -332,6 +337,8 @@ class AdminRevenueDashboardAPIView(APIView):
     
 class AdminDashboardAPIView(APIView):
 
+    permission_classes = [IsAdminUser]
+
     def get(self, request):
 
         # total users
@@ -376,3 +383,121 @@ class AdminDashboardAPIView(APIView):
         serializer = AdminDashboardSerializer(data)
 
         return Response(serializer.data)
+    
+class AdminProductsAPIView(APIView):
+
+    permission_classes = [IsAdminUser]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def get(self, request):
+
+        queryset = Product.objects.filter(is_deleted=False, is_active=True)
+
+        search = request.GET.get("search")
+        category = request.GET.get("category")
+        brand = request.GET.get("brand")
+        min_price = request.GET.get("min_price")
+        max_price = request.GET.get("max_price")
+
+        # Search
+        if search:
+            queryset = queryset.filter(
+                Q(name__icontains=search) |
+                Q(model_number__icontains=search)
+            )
+
+        # Category filter
+        if category:
+            queryset = queryset.filter(category__slug=category)
+
+        # Brand filter
+        if brand:
+            queryset = queryset.filter(brand__slug=brand)
+
+        # Price filter
+        if min_price:
+            queryset = queryset.filter(price__gte=min_price)
+
+        if max_price:
+            queryset = queryset.filter(price__lte=max_price)
+
+        queryset = queryset.select_related("category", "brand").order_by("-created_at")
+
+        # Pagination
+        paginator = AdminProductPagination()
+        paginated_queryset = paginator.paginate_queryset(queryset, request)
+
+        serializer = AdminProductSerializer(paginated_queryset, many=True)
+
+        return paginator.get_paginated_response(serializer.data)
+    
+    def post(self, request):
+
+        serializer = ProductCreateSerializer(data=request.data)
+
+        if serializer.is_valid():
+            product = serializer.save()
+
+            return Response(
+                {"message": "Product created successfully", "id": product.id},
+                status=status.HTTP_201_CREATED
+            )
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class CategoryListAPIView(APIView):
+
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        categories = Category.objects.filter(is_active=True)
+
+        serializer = CategorySerializer(categories, many=True)
+
+        return Response(serializer.data)
+
+
+class AdminProductDetailView(RetrieveUpdateAPIView):
+
+    permission_classes = [IsAdminUser]
+
+    parser_classes = [MultiPartParser, FormParser , JSONParser]
+
+    queryset = Product.objects.select_related(
+        "category",
+        "brand"
+    ).prefetch_related(
+        "cpu_spec",
+        "gpu_spec",
+        "ram_spec",
+        "motherboard_spec",
+        "storage_spec",
+        "psu_spec",
+        "case_spec",
+        "casefan_spec",
+        "cooler_spec"
+    )
+
+    def get_serializer_class(self):
+
+        if self.request.method in ["PUT", "PATCH"]:
+            return AdminProductUpdateSerializer
+
+        return AdminProductDetailSerializer
+    
+class AdminProductDeleteAPIView(APIView):
+
+    permission_classes = [IsAdminUser]
+
+    def delete(self, request, pk):
+
+        product = get_object_or_404(Product, pk=pk)
+
+        product.is_deleted = True
+        product.save(update_fields=["is_deleted"])
+
+        return Response(
+            {"message": "Product deleted successfully"},
+            status=status.HTTP_200_OK
+        )
+    

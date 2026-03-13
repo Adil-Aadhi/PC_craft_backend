@@ -66,7 +66,11 @@ class Product(models.Model):
         indexes = [
             models.Index(fields=["category", "is_active"]),
             models.Index(fields=["brand"]),
-            models.Index(fields=["is_active", "is_deleted"])
+            models.Index(fields=["price"]),
+            models.Index(fields=["is_active", "is_deleted"]),
+            models.Index(fields=["created_at"]),
+            models.Index(fields=["name"]),
+            models.Index(fields=["model_number"]),
         ]
 
 class CPUSpec(models.Model):

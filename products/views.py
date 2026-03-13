@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView
+from rest_framework.generics import RetrieveAPIView
 from rest_framework.response import Response
 from products.models import Product
 from .serializers import (
@@ -87,7 +88,26 @@ class BaseComponentListView(ListAPIView):
 
         return queryset
     
+class BaseComponentDetailView(RetrieveAPIView):
+    serializer_class = None
+    category_name = None
+    spec_related = None
+
+    def get_queryset(self):
+        return Product.objects.filter(
+            category__name=self.category_name,
+            is_active=True,
+            is_deleted=False,
+        ).select_related(
+            self.spec_related, "brand", "category"
+        )
+    
 class CPUListView(BaseComponentListView):
+    serializer_class = CPUSerializer
+    category_name = "CPU"
+    spec_related = "cpu_spec"
+
+class CPUDetailView(BaseComponentDetailView):
     serializer_class = CPUSerializer
     category_name = "CPU"
     spec_related = "cpu_spec"
@@ -97,7 +117,18 @@ class MotherboardListView(BaseComponentListView):
     category_name = "Motherboard"
     spec_related = "motherboard_spec"
 
+class MotherboardDetailView(BaseComponentDetailView):
+    serializer_class = MotherboardSerializer
+    category_name = "Motherboard"
+    spec_related = "motherboard_spec"
+
 class RAMListView(BaseComponentListView):
+    serializer_class = RAMSerializer
+    category_name = "RAM"
+    spec_related = "ram_spec"
+
+
+class RAMDetailView(BaseComponentDetailView):
     serializer_class = RAMSerializer
     category_name = "RAM"
     spec_related = "ram_spec"
@@ -107,7 +138,18 @@ class GPUListView(BaseComponentListView):
     category_name = "GPU"
     spec_related = "gpu_spec"
 
+
+class GPUDetailView(BaseComponentDetailView):
+    serializer_class = GPUSerializer
+    category_name = "GPU"
+    spec_related = "gpu_spec"
+
 class PSUListView(BaseComponentListView):
+    serializer_class = PSUSerializer
+    category_name = "PSU"
+    spec_related = "psu_spec"
+
+class PSUDetailView(BaseComponentDetailView):
     serializer_class = PSUSerializer
     category_name = "PSU"
     spec_related = "psu_spec"
@@ -117,7 +159,17 @@ class StorageListView(BaseComponentListView):
     category_name = "Storage"
     spec_related = "storage_spec"
 
+class StorageDetailView(BaseComponentDetailView):
+    serializer_class = StorageSerializer
+    category_name = "Storage"
+    spec_related = "storage_spec"
+
 class CaseListView(BaseComponentListView):
+    serializer_class = CabinetSerializer
+    category_name = "Case"
+    spec_related = "case_spec"
+
+class CaseDetailView(BaseComponentDetailView):
     serializer_class = CabinetSerializer
     category_name = "Case"
     spec_related = "case_spec"
@@ -127,7 +179,18 @@ class CaseFanListView(BaseComponentListView):
     category_name = "Case Fan"
     spec_related = "casefan_spec"
 
+
+class CaseFanDetailView(BaseComponentDetailView):
+    serializer_class = CaseFanSerializer
+    category_name = "Case Fan"
+    spec_related = "casefan_spec"
+
 class CoolerListView(BaseComponentListView):
+    serializer_class = CoolerSerializer
+    category_name = "Cooler"
+    spec_related = "cooler_spec"
+
+class CoolerDetailView(BaseComponentDetailView):
     serializer_class = CoolerSerializer
     category_name = "Cooler"
     spec_related = "cooler_spec"

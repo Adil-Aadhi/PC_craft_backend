@@ -5,6 +5,11 @@ from Worker.models import WorkerIdentityKYC
 from orders.models import Order
 from cart.serializer import CartItemReadSerializer
 from .models import WorkerEarning,AdminRevenue
+from products.models import Brand,Category,Product,CPUSpec, RAMSpec, GPUSpec, MotherboardSpec,CASESpec, STORAGESpec, PSUSpec, CASEFANSpec, COOLERSpec
+from django.db import transaction
+import json
+from django.db import models
+from products.serializers import CPUSerializer,GPUSerializer,RAMSerializer,StorageSerializer,PSUSerializer,CabinetSerializer,CaseFanSerializer,CoolerSerializer,MotherboardSerializer
 
 
 
@@ -208,3 +213,228 @@ class AdminDashboardSerializer(serializers.Serializer):
     total_revenue = serializers.DecimalField(max_digits=12, decimal_places=2)
 
     revenue_growth = serializers.ListField()
+
+class CategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Category
+        fields = ["id", "name", "slug"]
+
+class BrandSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Brand
+        fields = ["id", "name", "slug"]
+class AdminProductSerializer(serializers.ModelSerializer):
+    category = CategorySerializer(read_only=True)
+    brand = BrandSerializer(read_only=True)
+    in_stock = serializers.BooleanField(source="is_in_stock", read_only=True)
+
+    class Meta:
+        model = Product
+        fields = [
+            "id",
+            "name",
+            "slug",
+            "model_number",
+            "category",
+            "brand",
+            "price",
+            "stock_quantity",
+            "in_stock",
+            "image",
+            "created_at"
+        ]
+
+SPEC_MODEL_MAP = {
+    "cpu": CPUSpec,
+    "gpu": GPUSpec,
+    "ram": RAMSpec,
+    "motherboard": MotherboardSpec,
+    "case": CASESpec,
+    "storage": STORAGESpec,
+    "psu": PSUSpec,
+    "case-fan": CASEFANSpec,
+    "cooler": COOLERSpec,
+}
+
+class ProductCreateSerializer(serializers.ModelSerializer):
+
+    spec = serializers.JSONField(write_only=True)
+
+    class Meta:
+        model = Product
+        fields = [
+            "name",
+            "model_number",
+            "category",
+            "brand",
+            "price",
+            "stock_quantity",
+            "image",
+            "spec"
+        ]
+
+    def create(self, validated_data):
+
+        spec_data = validated_data.pop("spec")
+
+        if isinstance(spec_data, str):
+            spec_data = json.loads(spec_data)
+
+        category = validated_data["category"]
+        category_slug = category.slug
+
+        with transaction.atomic():
+
+            product = Product.objects.create(**validated_data)
+
+            spec_model = SPEC_MODEL_MAP.get(category_slug)
+
+            if spec_model:
+
+                valid_fields = {
+                    field.name
+                    for field in spec_model._meta.fields
+                }
+
+                filtered_spec = {
+                    key: value
+                    for key, value in spec_data.items()
+                    if key in valid_fields and value not in ["", None]
+                }
+
+                # 🔹 Convert values to correct types
+                for field in spec_model._meta.fields:
+
+                    name = field.name
+
+                    if name in filtered_spec:
+
+                        value = filtered_spec[name]
+
+                        # Boolean conversion
+                        if isinstance(field, models.BooleanField) and isinstance(value, str):
+                            filtered_spec[name] = value.lower() == "true"
+
+                        # Integer conversion
+                        if isinstance(field, models.IntegerField) and isinstance(value, str):
+                            filtered_spec[name] = int(value)
+
+                        # Float / Decimal conversion
+                        if isinstance(field, (models.FloatField, models.DecimalField)) and isinstance(value, str):
+                            filtered_spec[name] = float(value)
+
+                spec_model.objects.create(product=product, **filtered_spec)
+
+        return product
+    
+class AdminProductDetailSerializer(serializers.ModelSerializer):
+    category = CategorySerializer(read_only=True)
+    brand = BrandSerializer(read_only=True)
+
+    spec = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Product
+        fields = [
+            "id",
+            "name",
+            "slug",
+            "model_number",
+            "category",
+            "brand",
+            "price",
+            "stock_quantity",
+            "image",
+            "created_at",
+            "spec"
+        ]
+
+    def get_spec(self, obj):
+
+        if hasattr(obj, "cpu_spec"):
+            return CPUSerializer(obj).data
+
+        if hasattr(obj, "gpu_spec"):
+            return GPUSerializer(obj).data
+
+        if hasattr(obj, "ram_spec"):
+            return RAMSerializer(obj).data
+
+        if hasattr(obj, "motherboard_spec"):
+            return MotherboardSerializer(obj).data
+
+        if hasattr(obj, "storage_spec"):
+            return StorageSerializer(obj).data
+
+        if hasattr(obj, "psu_spec"):
+            return PSUSerializer(obj).data
+
+        if hasattr(obj, "case_spec"):
+            return CabinetSerializer(obj).data
+
+        if hasattr(obj, "casefan_spec"):
+            return CaseFanSerializer(obj).data
+
+        if hasattr(obj, "cooler_spec"):
+            return CoolerSerializer(obj).data
+
+        return None
+    
+class AdminProductUpdateSerializer(serializers.ModelSerializer):
+
+    image = serializers.FileField(required=False, write_only=True)
+    spec = serializers.JSONField(required=False)
+
+    class Meta:
+        model = Product
+        fields = [
+            "name",
+            "model_number",
+            "price",
+            "stock_quantity",
+            "category",
+            "brand",
+            "image",
+            "spec" 
+        ]
+
+    def update(self, instance, validated_data):
+        request = self.context.get("request")
+        spec_data = validated_data.pop("spec", None)
+        
+        # 1. Update the Product fields
+        for attr, value in validated_data.items():
+            if attr != "image": # Handled separately below
+                setattr(instance, attr, value)
+
+        if request.FILES.get("image"):
+            instance.image = request.FILES["image"]
+
+        instance.save()
+
+        # 2. Handle Specifications
+        if isinstance(spec_data, str):
+            try:
+                spec_data = json.loads(spec_data)
+            except json.JSONDecodeError:
+                spec_data = {}
+
+        spec_model = SPEC_MODEL_MAP.get(instance.category.slug)
+
+        if spec_model and spec_data:
+            valid_fields = {field.name for field in spec_model._meta.fields}
+            
+            # Remove 'id' and 'product' from data to prevent manual overwrite errors
+            filtered_spec = {
+                key: value
+                for key, value in spec_data.items()
+                if key in valid_fields and key not in ["id", "product"] and value not in ["", None]
+            }
+
+            # This replaces the entire try/except block
+            spec_model.objects.update_or_create(
+                product=instance, 
+                defaults=filtered_spec
+            )
+
+        return instance

@@ -19,6 +19,10 @@ class CPUSerializer(BaseProductSerializer):
     boost_clock = serializers.DecimalField(source="cpu_spec.boost_clock", max_digits=5, decimal_places=2)
     tdp = serializers.IntegerField(source="cpu_spec.tdp")
 
+    has_integrated_graphics = serializers.BooleanField(source="cpu_spec.has_integrated_graphics")
+    series = serializers.CharField(source="cpu_spec.series", allow_null=True, allow_blank=True)
+    l3_cache = serializers.CharField(source="cpu_spec.l3_cache", allow_null=True, allow_blank=True)
+
     class Meta(BaseProductSerializer.Meta):
         fields = BaseProductSerializer.Meta.fields + [
             "socket",
@@ -27,6 +31,9 @@ class CPUSerializer(BaseProductSerializer):
             "base_clock",
             "boost_clock",
             "tdp",
+            "has_integrated_graphics",
+            "series",
+            "l3_cache",
         ]
 
 class RAMSerializer(BaseProductSerializer):
@@ -35,28 +42,45 @@ class RAMSerializer(BaseProductSerializer):
     frequency_mhz = serializers.IntegerField(source="ram_spec.frequency_mhz")
     stick_count = serializers.IntegerField(source="ram_spec.stick_count")
 
+    voltage = serializers.DecimalField(
+        source="ram_spec.voltage",
+        max_digits=3,
+        decimal_places=2,
+        allow_null=True
+    )
+
     class Meta(BaseProductSerializer.Meta):
         fields = BaseProductSerializer.Meta.fields + [
             "ram_type",
             "capacity_gb",
             "frequency_mhz",
             "stick_count",
+            "voltage",
         ]
 
 class GPUSerializer(BaseProductSerializer):
     memory_gb = serializers.IntegerField(source="gpu_spec.memory_gb")
     memory_type = serializers.CharField(source="gpu_spec.memory_type")
+
+    base_clock_mhz = serializers.IntegerField(source="gpu_spec.base_clock_mhz")
+    boost_clock_mhz = serializers.IntegerField(source="gpu_spec.boost_clock_mhz", allow_null=True)
+
     length_mm = serializers.IntegerField(source="gpu_spec.length_mm")
     tdp = serializers.IntegerField(source="gpu_spec.tdp")
     recommended_psu_watt = serializers.IntegerField(source="gpu_spec.recommended_psu_watt")
+
+    gpu_chipset = serializers.CharField(source="gpu_spec.gpu_chipset")
 
     class Meta(BaseProductSerializer.Meta):
         fields = BaseProductSerializer.Meta.fields + [
             "memory_gb",
             "memory_type",
+            "base_clock_mhz",
+            "boost_clock_mhz",
             "length_mm",
             "tdp",
             "recommended_psu_watt",
+            "gpu_chipset",
         ]
 
 class MotherboardSerializer(BaseProductSerializer):
@@ -68,6 +92,9 @@ class MotherboardSerializer(BaseProductSerializer):
     form_factor = serializers.CharField(source="motherboard_spec.form_factor")
     pcie_version = serializers.CharField(source="motherboard_spec.pcie_version")
 
+    m2_slots = serializers.IntegerField(source="motherboard_spec.m2_slots", allow_null=True)
+    sata_ports = serializers.IntegerField(source="motherboard_spec.sata_ports", allow_null=True)
+
     class Meta(BaseProductSerializer.Meta):
         fields = BaseProductSerializer.Meta.fields + [
             "socket",
@@ -77,6 +104,8 @@ class MotherboardSerializer(BaseProductSerializer):
             "ram_slots",
             "form_factor",
             "pcie_version",
+            "m2_slots",
+            "sata_ports"
         ]
 
 class StorageSerializer(BaseProductSerializer):
