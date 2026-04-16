@@ -126,6 +126,7 @@ DATABASES = {
     }
 }
 
+
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 
@@ -211,6 +212,9 @@ CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
+    "http://localhost:3000",
+    "http://localhost",
+    "https://pc-craft-frontent.vercel.app",
 ]
 
 CORS_ALLOW_HEADERS = list(default_headers) + [
@@ -220,6 +224,9 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
 
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
+    "http://localhost:3000",
+    "http://localhost",
+    "https://pc-craft-frontent.vercel.app",
 ]
 
 REST_FRAMEWORK = {
