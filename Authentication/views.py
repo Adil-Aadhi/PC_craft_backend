@@ -15,6 +15,8 @@ from .models import PasswordResetOTP
 from django.core.mail import send_mail
 from django.utils import timezone
 from datetime import timedelta
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 
 
 # Create your views here.
@@ -201,7 +203,7 @@ class TokenRefreshCookieView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED
             )
         
-
+@method_decorator(csrf_exempt, name='dispatch')
 class GoogleAuthAPIView(APIView):
 
     @swagger_auto_schema(

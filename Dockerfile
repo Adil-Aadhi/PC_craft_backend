@@ -19,4 +19,5 @@ COPY . .
 EXPOSE 8000
 
 # Run Django dev server
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+# CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+CMD ["gunicorn", "pc_backend.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "1"]

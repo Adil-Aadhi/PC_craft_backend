@@ -11,12 +11,19 @@ User = get_user_model()
 
 @pytest.fixture
 def worker():
-    return User.objects.create_user(
+    user = User.objects.create_user(
         username="worker",
         email="worker@example.com",
         password="StrongPass123!",
         role="worker"
     )
+
+    # 🔥 FIX: set required fields
+    profile = user.worker_profile
+    profile.hourly_rate = 500
+    profile.save()
+
+    return user
 
 
 @pytest.mark.django_db

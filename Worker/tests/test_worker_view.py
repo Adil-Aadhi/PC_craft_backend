@@ -23,6 +23,7 @@ def create_user():
     return _create_user
 
 
+
 @pytest.fixture
 def create_worker(create_user):
     def _create_worker(**kwargs):
@@ -35,8 +36,12 @@ def create_worker(create_user):
         worker_profile = worker_user.worker_profile
 
         worker_profile.skills = "Electrician"
-        worker_profile.hourly_rate = "500.00"
+        worker_profile.hourly_rate = 500
         worker_profile.rating = 4.5
+
+        # 🔥 THIS IS THE REAL FIX
+        worker_profile.kyc_status = "approved"
+
         worker_profile.save()
 
         return worker_user, worker_profile

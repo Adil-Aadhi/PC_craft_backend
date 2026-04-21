@@ -54,6 +54,50 @@ class MyOrdersView(APIView):
 class CreateRazorpayOrderView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        operation_summary="Create Razorpay Order",
+        operation_description=(
+            "Creates a Razorpay order for a pending order. "
+            "Returns Razorpay order ID, amount (in paise), and public key."
+        ),
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=["order_id"],
+            properties={
+                "order_id": openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="UUID of the order"
+                ),
+            },
+        ),
+        responses={
+            200: openapi.Response(
+                description="Razorpay order created successfully",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "razorpay_order_id": openapi.Schema(
+                            type=openapi.TYPE_STRING,
+                            example="order_Jh12AbCdEf"
+                        ),
+                        "amount": openapi.Schema(
+                            type=openapi.TYPE_INTEGER,
+                            example=150000
+                        ),
+                        "key": openapi.Schema(
+                            type=openapi.TYPE_STRING,
+                            example="rzp_test_xxxxxxxx"
+                        ),
+                    },
+                ),
+            ),
+            400: openapi.Response(description="Invalid request"),
+            401: openapi.Response(description="Unauthorized"),
+            404: openapi.Response(description="Order not found"),
+        },
+        tags=["Payments"],
+    )
+
     def post(self, request):
         order_uuid = request.data.get("order_id")
 
